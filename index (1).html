@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bathroom Queue</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: Arial, sans-serif; background: #f4f6f8; color: #17202a;
+  }
+  .wrap { max-width: 1100px; margin: auto; padding: 24px; }
+  h1 { text-align: center; margin: 0 0 18px; font-size: 42px; }
+  .next {
+    background: white; border-radius: 20px; padding: 28px; text-align: center;
+    box-shadow: 0 4px 16px rgba(0,0,0,.10); margin-bottom: 20px;
+  }
+  .label { font-size: 24px; font-weight: bold; }
+  #nextName { font-size: 64px; font-weight: 800; margin: 8px 0; }
+  .buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  button, input, select {
+    font: inherit; border-radius: 12px; border: 1px solid #b8c0c8; padding: 12px 16px;
+  }
+  button { cursor: pointer; font-weight: bold; }
+  .primary { background: #17202a; color: white; border: 0; min-width: 170px; }
+  .danger { background: #fff; color: #b42318; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .card {
+    background: white; border-radius: 18px; padding: 20px;
+    box-shadow: 0 3px 12px rgba(0,0,0,.08);
+  }
+  .card h2 { margin-top: 0; }
+  .add { display: flex; gap: 10px; }
+  .add input { flex: 1; min-width: 0; }
+  ol { margin: 12px 0 0; padding-left: 32px; }
+  li { padding: 9px 4px; font-size: 22px; }
+  .empty { color: #667085; font-size: 18px; }
+  .current {
+    text-align: center; margin-top: 20px; padding: 14px;
+    border-radius: 12px; background: #eef2f6; font-size: 20px;
+  }
+  .settings { margin-top: 18px; font-size: 16px; }
+  @media (max-width: 700px) {
+    .grid { grid-template-columns: 1fr; }
+    #nextName { font-size: 48px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🚻 Bathroom Queue</h1>
+
+  <div class="next">
+    <div class="label">NEXT IN LINE</div>
+    <div id="nextName">No one waiting</div>
+    <div class="buttons">
+      <button class="primary" onclick="callNext()">🔊 CALL NEXT</button>
+      <button onclick="repeatAnnouncement()">🔁 REPEAT</button>
+      <button class="danger" onclick="clearQueue()">Clear Queue</button>
+    </div>
+    <div class="current" id="current">No student currently called.</div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Waiting List</h2>
+      <div class="add">
+        <input id="studentInput" placeholder="Enter student name" autocomplete="off">
+        <button onclick="addStudent()">Add</button>
+      </div>
+      <ol id="queue"></ol>
+      <div class="settings">
+        <label>
+          <input type="checkbox" id="voiceToggle" checked>
+          Speak announcement aloud
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Bathroom</h2>
+      <div id="outList" class="empty">No student currently in the bathroom.</div>
+      <div class="buttons" style="margin-top:16px">
+        <button onclick="returnStudent()">Student Returned</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let queue = [];
+let currentStudent = null;
+let voiceEnabled = true;
+
+const input = document.getElementById("studentInput");
+input.addEventListener("keydown", e => {
+  if (e.key === "Enter") addStudent();
+});
+
+document.getElementById("voiceToggle").addEventListener("change", e => {
+  voiceEnabled = e.target.checked;
+});
+
+function render() {
+  const list = document.getElementById("queue");
+  const next = document.getElementById("nextName");
+  list.innerHTML = "";
+
+  if (queue.length === 0) {
+    next.textContent = "No one waiting";
+    list.innerHTML = '<div class="empty">The waiting list is empty.</div>';
+  } else {
+    next.textContent = queue[0];
+    queue.forEach((name, i) => {
+      const li = document.createElement("li");
+      li.textContent = name;
+      if (i === 0) li.style.fontWeight = "800";
+      list.appendChild(li);
+    });
+  }
+
+  document.getElementById("current").textContent =
+    currentStudent ? "🚻 Currently in bathroom: " + currentStudent : "No student currently called.";
+
+  document.getElementById("outList").innerHTML =
+    currentStudent
+      ? "<div style='font-size:32px;font-weight:800;text-align:center'>" + escapeHtml(currentStudent) + "</div>"
+      : '<div class="empty">No student currently in the bathroom.</div>';
+}
+
+function addStudent() {
+  const name = input.value.trim();
+  if (!name) return;
+  if (queue.some(n => n.toLowerCase() === name.toLowerCase()) || name.toLowerCase() === (currentStudent || "").toLowerCase()) {
+    input.value = "";
+    return;
+  }
+  queue.push(name);
+  input.value = "";
+  render();
+}
+
+function callNext() {
+  if (!queue.length) {
+    announce("There is no one waiting.");
+    return;
+  }
+
+  if (currentStudent) {
+    announce(currentStudent + " is still in the bathroom.");
+    return;
+  }
+
+  currentStudent = queue.shift();
+  const message = "Next in line: " + currentStudent + "!";
+  announce(message);
+  render();
+}
+
+function repeatAnnouncement() {
+  if (currentStudent) {
+    announce("Next in line: " + currentStudent + "!");
+  } else if (queue.length) {
+    announce("Next in line: " + queue[0] + "!");
+  } else {
+    announce("There is no one waiting.");
+  }
+}
+
+function returnStudent() {
+  currentStudent = null;
+  render();
+}
+
+function clearQueue() {
+  if (confirm("Clear the entire waiting list?")) {
+    queue = [];
+    currentStudent = null;
+    render();
+  }
+}
+
+function announce(text) {
+  if (!voiceEnabled || !("speechSynthesis" in window)) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 0.9;
+  u.pitch = 1;
+  speechSynthesis.speak(u);
+}
+
+function escapeHtml(text) {
+  const d = document.createElement("div");
+  d.textContent = text;
+  return d.innerHTML;
+}
+
+render();
+</script>
+</body>
+</html>
